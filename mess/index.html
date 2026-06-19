@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мини Мессенджер</title>
+
+    <!-- Используем CDN от Яндекс для стилей (работает без блокировок) -->
+    <link rel="stylesheet" href="https://yastatic.net" style="display:none;">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <style>
+        /* Скрываем скроллбар для красоты, но оставляем возможность скроллить */
+        
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body class="bg-zinc-900 text-white h-screen flex justify-center items-center font-sans antialiased">
+
+    <!-- Главный контейнер приложения -->
+    <div class="w-full h-full md:max-w-5xl md:h-[90vh] md:rounded-2xl md:border md:border-zinc-800 bg-zinc-950 flex overflow-hidden shadow-2xl">
+
+        <!-- ================= SIDEBAR (Список чатов) ================= -->
+        <div id="sidebar" class="w-full md:w-80 border-r border-zinc-800 flex flex-col h-full bg-zinc-950/50 shrink-0">
+            <!-- Шапка сайдбара -->
+            <div class="p-4 border-b border-zinc-800 flex items-center justify-between">
+                <h1 class="text-xl font-bold tracking-wide">Мессенджер</h1>
+                <span class="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-full font-medium">Онлайн</span>
+            </div>
+
+            <!-- Список чатов (Рендерится через JS) -->
+            <div id="chats-list" class="flex-1 overflow-y-auto no-scrollbar divide-y divide-zinc-900">
+                <!-- Сюда JS вставит чаты -->
+            </div>
+        </div>
+
+        <!-- ================= CHAT AREA (Окно переписки) ================= -->
+        <div id="chat-area" class="hidden md:flex flex-col flex-1 h-full bg-zinc-900/30">
+
+            <!-- Заглушка, когда ни один чат не выбран -->
+            <div id="chat-placeholder" class="flex-1 flex flex-col items-center justify-center text-zinc-500 p-4 text-center">
+                <span class="text-4xl mb-2">💬</span>
+                <p class="text-sm">Выберите чат, чтобы начать общение</p>
+            </div>
+
+            <!-- Активное окно чата (скрыто, пока чат не выбран) -->
+            <div id="chat-active" class="hidden flex-col h-full">
+                <!-- Шапка чата -->
+                <div class="p-4 border-b border-zinc-800 flex items-center bg-zinc-950/40">
+                    <button id="back-btn" class="md:hidden mr-3 p-1 hover:bg-zinc-800 rounded-lg transition">
+                        <span class="text-xl">🔙</span>
+                    </button>
+                    <div id="chat-avatar" class="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-lg mr-3 shadow-inner"></div>
+                    <div>
+                        <h2 id="chat-title" class="font-semibold text-sm">Имя собеседника</h2>
+                        <span class="text-xs text-zinc-400">печатает...</span>
+                    </div>
+                </div>
+
+                <!-- Лента сообщений -->
+                <div id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar bg-zinc-950/20">
+                    <!-- Сюда JS вставит сообщения -->
+                </div>
+
+                <!-- Панель ввода -->
+                <form id="message-form" class="p-4 bg-zinc-950/40 border-t border-zinc-800 flex gap-2 items-center">
+                    <input id="message-input" type="text" placeholder="Напишите сообщение..." autocomplete="off" class="flex-1 bg-zinc-800/60 border border-zinc-700/50 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500 transition text-white placeholder-zinc-500">
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition active:scale-95 shadow-md shadow-emerald-900/20">
+                        Отправить
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+    </div>
+    <!-- ИСПРАВЛЕНО: Закрыли главный контейнер -->
+</body>
+<!-- ИСПРАВЛЕНО: Закрыли тег body -->
+
+<!-- Скрипт теперь находится за пределами верстки, браузер прочитает его сразу -->
+<script>
+    const chatsData = [{
+        id: "chat_1",
+        name: "Дмитрий (Разработка)",
+        avatar: "👨‍💻",
+        messages: [{
+            id: "m1",
+            text: "Привет! Как там компас?",
+            sender: "friend",
+            time: "14:15"
+        }, {
+            id: "m2",
+            text: "Привет! Всё работает, пишу шаблон",
+            sender: "me",
+            time: "14:16"
+        }, {
+            id: "m3",
+            text: "Отлично, давай пилить мессенджер!",
+            sender: "friend",
+            time: "14:17"
+        }]
+    }, {
+        id: "chat_2",
+        name: "Флудилка (Кофе)",
+        avatar: "☕",
+        messages: [{
+            id: "m4",
+            text: "Кто пойдет пить кофе через 5 минут?",
+            sender: "friend",
+            time: "15:00"
+        }]
+    }, {
+        id: "chat_3",
+        name: "Мама",
+        avatar: "❤️",
+        messages: [{
+            id: "m5",
+            text: "Ты покушал?",
+            sender: "friend",
+            time: "11:02"
+        }]
+    }];
+
+    let activeChatId = null;
+
+    const chatsList = document.getElementById('chats-list');
+    const sidebar = document.getElementById('sidebar');
+    const chatArea = document.getElementById('chat-area');
+    const chatPlaceholder = document.getElementById('chat-placeholder');
+    const chatActive = document.getElementById('chat-active');
+
+    const chatTitle = document.getElementById('chat-title');
+    const chatAvatar = document.getElementById('chat-avatar');
+    const messagesContainer = document.getElementById('messages-container');
+    const messageForm = document.getElementById('message-form');
+    const messageInput = document.getElementById('message-input');
+    const backBtn = document.getElementById('back-btn');
+
+    function renderChats() {
+        chatsList.innerHTML = '';
+        chatsData.forEach(chat => {
+            const lastMsg = chat.messages[chat.messages.length - 1];
+            const lastText = lastMsg ? lastMsg.text : 'Нет сообщений';
+            const lastTime = lastMsg ? lastMsg.time : '';
+
+            const chatItem = document.createElement('div');
+            chatItem.className = `p-4 flex items-center cursor-pointer hover:bg-zinc-900/50 transition ${chat.id === activeChatId ? 'bg-zinc-900 border-l-2 border-emerald-500' : ''}`;
+
+            chatItem.innerHTML = `
+                <div class="w-11 h-11 rounded-full bg-zinc-800 flex items-center justify-center text-xl mr-3 shrink-0 shadow-inner">${chat.avatar}</div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex justify-between items-baseline mb-0.5">
+                        <h3 class="font-medium text-sm truncate">${chat.name}</h3>
+                        <span class="text-[10px] text-zinc-500 whitespace-nowrap ml-2">${lastTime}</span>
+                    </div>
+                    <p class="text-xs text-zinc-400 truncate">${lastText}</p>
+                </div>`;
+
+            chatItem.addEventListener('click', () => selectChat(chat.id));
+            chatsList.appendChild(chatItem);
+        });
+    }
+
+    function selectChat(chatId) {
+        activeChatId = chatId;
+        const chat = chatsData.find(c => c.id === chatId);
+
+        chatTitle.innerText = chat.name;
+        chatAvatar.innerText = chat.avatar;
+
+        chatPlaceholder.classList.add('hidden');
+        chatActive.classList.remove('hidden');
+
+        if (window.innerWidth < 768) {
+            sidebar.classList.add('hidden');
+            chatArea.classList.remove('hidden');
+            chatArea.classList.add('flex');
+        }
+
+        renderMessages(chat.messages);
+        renderChats();
+    }
+
+    function renderMessages(messages) {
+        messagesContainer.innerHTML = '';
+        messages.forEach(msg => {
+            const isMe = msg.sender === 'me';
+            const msgBubble = document.createElement('div');
+            msgBubble.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
+
+            msgBubble.innerHTML = `
+                <div class="max-w-[75%] rounded-2xl px-3.5 py-2 text-sm shadow-sm flex flex-col gap-0.5
+                    ${isMe ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-zinc-800 text-zinc-100 rounded-bl-none'}">
+                    <p class="leading-relaxed break-words">${msg.text}</p>
+                    <span class="text-[9px] self-end text-white/60">${msg.time}</span>
+                </div>`;
+            messagesContainer.appendChild(msgBubble);
+        });
+        messagesContainer.scrollTo({
+            top: messagesContainer.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
+
+    messageForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = messageInput.value.trim();
+
+        if (!text || !activeChatId) return;
+
+        const chat = chatsData.find(c => c.id === activeChatId);
+        const now = new Date();
+        const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+
+        chat.messages.push({
+            id: 'm_' + Date.now(),
+            text: text,
+            sender: 'me',
+            time: timeStr
+        });
+        messageInput.value = '';
+
+        renderMessages(chat.messages);
+        renderChats();
+    });
+
+    backBtn.addEventListener('click', () => {
+        sidebar.classList.remove('hidden');
+        chatArea.classList.add('hidden');
+        chatArea.classList.remove('flex');
+        activeChatId = null;
+        renderChats();
+    });
+
+    // Стартуем приложение
+    renderChats();
+</script>
+
+</html>
